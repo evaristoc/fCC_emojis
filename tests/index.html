@@ -1,0 +1,169 @@
+<head>
+    	<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js " integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN " crossorigin="anonymous "></script>
+    	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js " integrity="sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh " crossorigin="anonymous "></script>
+    	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js " integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ " crossorigin="anonymous "></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/2.10.0/d3.v2.min.js"></script>
+    <!--<script type='text/javascript' src='./script.js'></script>-->
+</head>
+<body>
+  <div class="container">
+    <h2>D3 Graphic</h2>
+    <div id="chart"></div>
+  </div>
+<script>
+//http://jsfiddle.net/mbrownshoes/ozpt6dn7/2/
+//see what the strokes do in an animation:
+//-- https://css-tricks.com/almanac/properties/s/stroke-dashoffset/
+//-- https://codepen.io/chriscoyier/pen/bGyoz
+//The data for my line
+var lineData = [{
+    "x": 10,
+    "y": 5,
+    "t": 700
+}, {
+    "x": 200,
+    "y": 20,
+    "t": 800
+}, {
+    "x": 400,
+    "y": 10,
+    "t": 900
+}, {
+    "x": 250,
+    "y": 40,
+    "t": 100
+}, {
+    "x": 350,
+    "y": 200,
+    "t": 1000
+}, {
+    "x": 200,
+    "y": 500,
+    "t": 1100
+}, {
+    "x": 120,
+    "y": 80,
+    "t": 900
+}, {
+    "x": 100,
+    "y": 500,
+    "t": 900
+}, {
+    "x": 100,
+    "y": 50,
+    "t": 800
+}];
+
+
+var ss = d3.select('#chart')
+	.append('svg')
+	.attr('width', 760)
+	.attr('height', 690)
+	.style('background', "#93A1A1");
+
+var lineFunction = d3.svg.line()
+			.x(function (d) {
+				return d.x;})
+			.y(function (d) {
+				return d.y;});
+
+var temp = []; //the line start with nothing, empty
+
+var tottime = 0;
+var wait = {};
+var ipath = 0;
+
+ var circle = ss.append("circle")
+    .attr("r", 13)
+    .attr("transform", function () {
+		return "translate(" + lineData[0].x + "," +lineData[0].y + ")"; //translate the circle to the place the line move!
+	});
+
+
+for (var i = 0; i < lineData.length - 1; ++i) {
+
+    wait[i] = tottime;
+    tottime += lineData[i].t;
+    
+	setTimeout(function() {
+		temp[0] = lineData[ipath];
+		temp[1] = lineData[ipath + 1];
+		time = lineData[ipath].t;
+
+		var lineGraph = ss.append("path")
+			.attr("d", lineFunction(temp))
+			.attr("stroke", "grey")
+			.attr("stroke-width", 3)
+			.attr("fill", "none");
+ 
+ 		var totalLength = lineGraph.node().getTotalLength(); //distance the line has covered
+
+		console.log('totalLength : ', totalLength)
+		console.log("paths, current x, next x and time : ", ipath + " " + temp[0].x + " " + temp[1].x + " " + time);
+
+		//the line is there: it is just being "uncovered" up to the corresponding length only
+		lineGraph.attr("stroke-dasharray", totalLength + " " + totalLength) 
+			.attr("stroke-dashoffset", totalLength)
+			.transition()
+			.duration(time)
+			.ease("linear")
+			.attr("stroke-dashoffset", 0);
+		
+		circle
+			.transition()
+			.duration(time)
+			.ease("linear")
+			.attr("transform", function () {
+				return "translate(" + temp[1].x + "," +temp[1].y + ")";
+			});
+
+		console.log(ipath+": "+time+", "+wait);
+		
+		ipath++;
+    }, wait[i]);
+
+
+}
+/*
+    (function(line,i, ipath, wait, ss){
+    setTimeout(function() {
+		console.log(tottime,line,wait, ss)
+		temp[0] = line[ipath];
+		temp[1] = line[ipath + 1];
+		time = lineData[ipath].t;
+
+		var lineGraph = ss.append("path")
+			.attr("d", lineFunction(temp))
+			.attr("stroke", "grey")
+			.attr("stroke-width", 3)
+			.attr("fill", "none");
+
+		console.log(ss);
+		
+		var totalLength = lineGraph.node().getTotalLength();
+
+		console.log(totalLength);
+		console.log(ipath + " " + temp[0].x + " " + temp[1].x + " " + time);
+
+		lineGraph.attr("stroke-dasharray", totalLength + " " + totalLength)
+			.attr("stroke-dashoffset", totalLength)
+			.transition()
+			.duration(time)
+			.ease("linear")
+			.attr("stroke-dashoffset", 0);
+		
+		circle
+			.transition()
+			.duration(time)
+			.ease("linear")
+			.attr("transform", function () {
+				return "translate(" + temp[1].x + "," +temp[1].y + ")";
+			});
+		        
+		console.log(ipath+": "+time+", "+wait);
+		ipath++;
+
+	}, wait);})(lineData, i, ipath, wait[i], ss)
+*/
+</script>
+</body>
