@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+
+  svg {
+	background-color: grey; 
+  }
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.axis text {
+  font: 14px sans-serif;
+  fill: white;
+}
+
+.cells path {
+  fill: none;
+  pointer-events: all;
+}
+
+.cells :hover circle {
+  fill: white;
+}
+
+  
+  .x-axis path,
+  .x-axis line {
+    fill: none;
+    stroke: white;
+    shape-rendering: crispEdges;
+  }
+
+  .y-axis path,
+  .y-axis line {
+    fill: none;
+    stroke: none;
+    shape-rendering: crispEdges;
+  }  
+  
+  .axis text {
+      font-family: sans-serif;
+      font-size: 9px;
+	  fill: white;
+  }
+  
+  rect{
+	rx: 5px;
+	ry: 5px;
+  }
+
+</style>
+<div id="beeswarm"></div>
+
+<div id="heatmap"></div>
+<div>
+  <form>
+	<label>Emojis</label>
+	<select id="choice" name="test">
+	</select>
+  </form>
+</div>
+
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script>
+    
+    var width_bs = 1120;
+    var height_bs = 500;
+        
+    var svg_bs = d3.select("#beeswarm").append("svg");
+    var margin_bs = {top_bs: 0, right_bs: 40, bottom_bs: 0, left_bs: 40};
+    width_bs = width_bs - margin_bs.left_bs - margin_bs.right_bs;
+    height_bs = height_bs - margin_bs.top_bs - margin_bs.bottom_bs;
+    
+    svg_bs
+        .attr("width", width_bs)
+        .attr("height",height_bs)
+    
+    // parse the date / time
+    var parseTime = d3.timeParse("%d-%b-%y");
+    
+    // set the ranges
+    var xDom_bs = d3.scaleTime().range([0, width_bs]);
+
+
+    var g_bs = svg_bs.append("g")
+        .attr("transform", "translate(" + margin_bs.left_bs + "," + margin_bs.top_bs + ")");
+    
+    
+    d3.json("emojis_date_final.json", function(err, data){
+        if (err) console.log(err);
+        
+        console.log(data);
+        
+        //for (var key in data) {
+        //    // skip loop if the property is from prototype
+        //    if (!data.hasOwnProperty(key)) continue;
+        //    console.log(key)
+        //}
+        
+        var withdate = []
+        var withoutdate = []
+        
+        Object.keys(data).forEach(key => {
+            //console.log(key);          // the name of the current key.
+            //console.log(data[key].first);
+            //console.log(new Date(data[key].first)) //this is the way
+            data[key]['unicode'] = key
+            if (data[key].first == '2018-12-31') {
+                withoutdate.push(data[key])
+            }else{
+                withdate.push(data[key])
+            }
+        });
+        
+        //console.log(d3.extent(withdate, function(d){console.log(d.first); return new Date(d.first)}))
+        
+        xDom_bs.domain(d3.extent(withdate, function(d){return new Date(d.first)}))
+
+
+        var simulation = d3.forceSimulation(withdate)
+            .force("x", d3.forceX(function(d) { return xDom_bs(new Date(d.first)); }).strength(1))
+            .force("y", d3.forceY(height_bs / 2))
+            .force("collide", d3.forceCollide(10))
+            .stop();
+
+        for (var i = 0; i < 120; ++i) simulation.tick();
+        
+        g_bs.append("g")
+            .attr("class", "axis axis--x")
+            .attr("transform", "translate(0," + height_bs + ")")
+            .call(d3.axisBottom(xDom_bs).ticks(20));
+            
+        
+        //the values of d.x and d.y are assigned to each data point at the *.forceSimulation(...) step
+            
+        var cell_bs = g_bs.append("g")
+            .attr("class", "cells")
+            .selectAll("g")
+            .data(d3.voronoi()
+                    .extent([[-margin_bs.left_bs, -margin_bs.top_bs], [width_bs + margin_bs.right_bs, height_bs + margin_bs.top_bs]])
+                    .x(function(d) { return d.x; })
+                    .y(function(d) { return d.y; })
+                    .polygons(withdate))
+            .enter()
+            .append("g");
+
+       cell_bs
+            .append("circle")
+            .attr("r", 5)
+            .attr("cx", function(d) { return d.data.x; })
+            .attr("cy", function(d) { return d.data.y; })
+            .attr("fill", "transparent")
+            .attr("stroke", "black")
+            
+    
+        
+        //var testimg = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD0AAAA9CAYAAAAeYmHpAAADD0lEQVR42u2aq3LrMBCG+0oH9hUOPK9QWFhYemBhYWhhYWBpYGBgqGGgYduv039mq65l+SY7sjXjcS62pW/1e6Vd6eZ9heVGH46nS/FHdal/Qv+5OxZ/PO+rDTpr5bf3x/fDp9wed+f1QO8Pl686689XDAMUDw2kLU+vVfnQSNqW47kuH1rStqV46HNV/4L+9/9UNrRXcnnxWaDpUa/s9lW50HdPPnQuZzYL9O670g36e5JSLLQ3XOWsfxZoZLxBZx6rFweNZy8OmsAiVjDI1BFXNmjFzikFLz5lj2eBBqC6dE/cTTVDmxy6aUxOLVPIfTJoGhpzWF3K2HKfBJoG1vX4eeqXt2qZ0EPl3FaIw/8+npYBPaacU+T+8HyeF5oG1Hl4R5H7YGgqTi2M00xOYqElBiQgSTViH7n3hqYiL8/lgZIGssNOahIBA2DUtjG+q9x7QcfkzO/0VAiakjmJTUYIRNoMQL0pY3ov6NBhCTTV2qhkyAwMA3Ctp7QUqfeClsU59500eKXPKgeQ3CcDXF0KOEdYOSu0N6avEjrXyuVs0N74XvxaVphQwDEWu5aFhJsmNUPn1IuEpidTMihTL9BnhaaHcWBMLOhRK3E8N7BMcrju6nNkbQt5gK5qSxWSz7nJZttHNgZ0alzLdepdzlfb04Aw5LRlM7SrSI4Kp8VxtT0NcNsEQ1kTQWOERe8YRIYaVpT6sdIESDCc+a7Yl4NrPWjF0ahFz+B31eGth/Ef7QiHNt2nugdDhxvewhSPTQR4eTAPWoFHakbFC1Q0i/Pq9IzWWd40jMZbA8SgsbqGJk/eHjSzNuqQn+C70lThM/lfPkHP4jolFzwn2QmaSqiQh3NoShmDDuWXAu31rL0XWeuVsW3Q/3KoTaNJJ2glAzlbmeWGjm3b4BqbtPScZDJ0KD0bE+eC1oJ+SiSm18/bppUMbTOYknjunlYb6EmgMLpdyqVdvN8YR/cNgg7lRY/bBuWAVg9a+fJZTtJmRWPxeWfvjbVzJfBi8wXa0NQOtbFpersFHBv0Bl049JrKB2+Sq02r4bQjAAAAAElFTkSuQmCC"
+        
+        cell_bs
+            .append("image")
+            .attr('x',function(d) { return d.data.x - 5; })
+            .attr('y',function(d) { return d.data.y - 5; })
+            .attr('width', 10)
+            .attr('height', 10)
+            //.attr("xlink:href",testimg);
+            //.attr("xlink:href",function(d,i){console.log("xlink ",d.data); return d.data.Apple_img})
+            .attr("xlink:href",function(d,i){return d.data.Apple_img})
+        
+
+      cell_bs
+            .on("mouseover", function(d){
+              //console.log(d, this);
+               var _sel = d3
+                      .select(this)
+                _sel
+                  .select("circle")
+                  .attr("r", 15)
+                  
+                _sel
+                  .select("image")
+                  .attr('x',function(d) { return d.data.x - 10; })
+                  .attr('y',function(d) { return d.data.y - 10; })
+                  .attr('width', 20)
+                  .attr('height', 20)
+            })
+            .on("mouseout", function(d){
+               var _sel = d3
+                      .select(this)
+                _sel
+                  .select("circle")
+                  .attr("r", 5)
+                  
+                _sel
+                  .select("image")
+                  .attr('x',function(d) { return d.data.x - 5; })
+                  .attr('y',function(d) { return d.data.y - 5; })
+                  .attr('width', 10)
+                  .attr('height', 10)                   
+            })
+
+
+        cell_bs
+            .append("path")
+            .attr("d", function(d) { return "M" + d.join("L") + "Z"; })
+
+        
+        cell_bs
+            .append("title")
+            .text(function(d) {
+              //console.error(d);
+              //console.log("title ",d);
+                return d.data.CLRDname + "\nin chat: " + d.data.first
+            });
+
+        
+        cell_bs
+            .append("rect")
+            .attr("width",1)
+            //.attr("height",function(d, i){return height - d.data.y})
+            .attr("height",function(d, i){return 20})
+            .attr("x",function(d, i){return d.data.x})
+            .attr("y",function(d, i){return d.data.y})
+            .attr("transform",function(d,i){return "translate(0," + (height_bs - d.data.y - 20) + ")"})
+    
+    })
+
+  var itemSize = 22,
+      cellSize = itemSize - 1,
+      //margin = {top: 120, right: 20, bottom: 20, left: 110};
+	  margin = {top: 70, right: 50, bottom: 70, left: 70};
+      
+  var width = 950 - margin.right - margin.left,
+      height = 300 - margin.top - margin.bottom;
+
+  //var formatDate = d3.time.format("%Y-%m-%d");
+  
+  // set the ranges
+  var xScale = d3.scaleBand().range([0, width]);
+  var xScale_axis = d3.scaleTime().range([0, width]);
+  var yScale = d3.scaleBand().range([0,height]);
+
+
+// append the svg object to the body of the page
+// appends a 'group' element to 'svg'
+// moves the 'group' element to the top left margin
+var svg = d3.select("#heatmap").append("svg")
+			.attr("width", width + margin.left + margin.right)
+			.attr("height", height + margin.top + margin.bottom)
+			.append("g")
+			.attr("transform",
+				  "translate(" + margin.left + "," + margin.top + ")");
+  
+  
+  d3.json('emojis_billboard_final.json', function(err, data){
+	
+  if (err) {
+	console.log(err)
+  }
+  
+  //console.log(data)
+  
+  var datalist = []
+  
+  	function ranking_conv(v){
+	  switch(v){
+		case 1:
+		  return "first";
+		case 2:
+		  return "second";
+		case 3:
+		  return "third";
+		case 4:
+		  return "fourth";
+		case 5:
+		  return "fihth";
+	  }
+	}
+  
+  for (var carita in data) {
+	delete data[carita]['2014-Dec'];
+	delete data[carita]['2017-12'];
+	var indates = []
+	for (c in data[carita]) {
+	  if (c != "data") {
+		//console.log("err in for-loop?", c, data[carita][c])
+		//if (data[carita][c]["order"] != -1) {
+		  indates.push({"date":c, "count": data[carita][c]["count"], "ranking":ranking_conv(data[carita][c]["order"])})
+		//}
+		delete data[carita][c];
+	  }
+	}
+	data[carita]['dates'] = indates;
+	data[carita]['bashunicode'] = carita;
+	datalist.push(data[carita])
+  }
+  
+  datalist = datalist.sort(function(a, b){return b.data.total - a.data.total});
+  
+  //console.log(datalist)
+  
+  //Generate a form with d3.js - dropdown option selection
+  
+  var options = datalist.map(function(d){return d.bashunicode+' '+d.data.CLRDname},[])
+  
+  d3
+	.select('#choice')
+	.selectAll('option')
+	.data(options)
+	.enter()
+	.append("option")
+	.attr("value", function(d){return d})
+	.text(function(d){return d});
+  
+  //Some (hardcoded) variables for the Axes
+  var rankings = ["first","second","third","fourth","fihth"]
+  var dates = datalist[0]["dates"].map(function(d){return d.date})
+  //dates = dates.filter(function(d) {return (d != 'data') & (d != 'bashunicode')})
+  
+  //console.log(dates)
+  
+  
+  //Parametrization of layouts and Axes
+  xScale
+	.domain(dates)
+	
+  xScale_axis
+	.domain([new Date("2015-01"), new Date("2017-12")])
+
+  yScale
+	.domain(rankings)
+
+ 
+  // Add the x Axis
+  svg.append("g")
+	  .attr("class","axis x-axis")
+      .attr("transform", "translate("+ cellSize/2 +"," + height + ")")
+      //.call(d3.axisBottom(xScale))
+	  .call(d3.axisBottom(xScale_axis).tickFormat(d3.timeFormat("%Y-%m")).ticks(10))
+	  //.selectAll('text')
+      //.attr("dx", "-.8em")
+      //.attr("dy", ".5em")	
+	  //.attr("transform", function (d) { return "rotate(-65)"; });  
+  
+  
+  // Add the y Axis
+  svg.append("g")
+	  .attr("class","axis y-axis")
+      .attr("transform", "translate(0, 0)")
+      .call(d3.axisLeft(yScale))
+
+	  
+  
+  // Matrix background
+  var matrixbackground = []
+  
+  for(var i = 0; i < dates.length; i++) {
+	for(var j = 0; j < rankings.length; j++){
+	  matrixbackground.push({"date":dates[i],"ranking":rankings[j]})
+	}
+  }
+  
+  //console.log(matrixbackground);
+  
+    //data binding
+	var cells = svg
+		.selectAll('rect')
+    
+	//enter    
+	var background = cells	
+		.data(matrixbackground, function(d, i){return d})
+		.enter()
+		.append('g')
+		.attr('class', 'back-cells')
+		
+	background
+		.append('rect')
+        .attr('class', 'back-cell')
+        .attr('width', cellSize)
+        .attr('height', cellSize + 5)
+		.attr('y', function(d) { return yScale(d.ranking); })
+        .attr('x', function(d) { return xScale(d.date); })
+
+  
+  // True data initialization
+  //data binding
+  //console.log(datalist[0]["dates"])
+  var used_emoji = datalist[0];
+  var emoji_dates = used_emoji["dates"];
+  var emoji_data = used_emoji["data"];
+  
+  //console.log(emoji_dates);
+  //console.log(emoji_data);
+	
+	var emo_cells = cells
+	//background
+		.data(emoji_dates, function(d, i){delete d.count; return d})
+		.enter()
+		.append('g')
+		.attr('class', 'emo-cells')
+		
+//	var emo_frame = emo_cells
+//	//background
+//		.append('rect')
+//        .attr('class', function(d){return 'emo-cell'})
+//        .attr('width', function(d) { if(d.ranking != undefined ) return cellSize;})
+//        .attr('height', function(d) { if(d.ranking != undefined ) return cellSize + 5;})
+//		.style('opacity',0)
+//		.attr('fill', function(d) { if(d.ranking != undefined ) return "white"; })
+//
+//		
+//	emo_frame
+//		.transition()
+//		.duration(1100)
+//		.delay(function(d,i){return i*20})
+//		.style("opacity",100)
+//		.attr('y', function(d) { if(d.ranking != undefined) return yScale(d.ranking); })
+//        .attr('x', function(d) { if(d.ranking != undefined ) return xScale(d.date); })
+
+		
+    var emo_img = emo_cells
+			.append("image")
+			.attr('class', 'emo-img')
+            .attr('width', function(d) { if(d.ranking != undefined ) return 20})
+            .attr('height', function(d) { if(d.ranking != undefined ) return 20})
+			.style('opacity',0)
+			.attr("xlink:href",function(d){if(d.ranking != undefined) return emoji_data["Apple_img"]})
+
+	emo_img
+			.transition()
+			.duration(1000)
+			.delay(function(d,i){return i*20})
+			.style("opacity",100)
+			.attr('y',function(d) { if(d.ranking != undefined ) return yScale(d.ranking)+2; })
+            .attr('x',function(d) { if(d.ranking != undefined ) return xScale(d.date); })			
+
+
+
+            
+		
+	//emo_cells.remove()
+	
+	
+	var update = function(emoji_dt, emoji_dat){
+		//console.log(svg, emo_cells, emo_frame, emo_img)
+	  //emo_cells.remove();
+	  //console.log(emo_cells.selectAll("g .emo-cells"))
+	  //console.log(emo_cells.select("g").select("rect"))
+	  //emo_cells.select("g").selectAll("rect").remove();
+
+	  //emo_cells.selectAll("rect").transition().duration(1500).delay(function(d,i){return i*10}).style("opacity",0).remove();
+	  emo_cells
+		.selectAll("image")
+		.transition()
+		.duration(1500)
+		.delay(function(d,i){return i*10})
+		.attr('y', 0)
+        .attr('x', 0)	
+		.style("opacity",0)
+		.remove();
+	  
+	  emo_cells = cells
+		  .data(emoji_dt, function(d, i){delete d.count; return d})
+		  .enter()
+		  .append('g')
+		  .attr('class', 'emo-cells')	  
+	
+	//  emo_frame = emo_cells
+	//  //background
+	//	  .append('rect')
+	//	  .attr('class', 'emo-cell')
+	//	  .attr('width', function(d) { if(d.ranking != undefined ) return cellSize;})
+	//	  .attr('height', function(d) { if(d.ranking != undefined ) return cellSize + 5;})
+	//	  .style('opacity',0)
+	//	  .attr('fill', function(d) { if(d.ranking != undefined ) return "white"; })
+	// 
+	//	  
+	//  emo_frame
+	//	  .transition()
+	//	  .duration(1100)
+	//	  .delay(function(d,i){return i*20})
+	//	  .style("opacity",100)
+	//	  .attr('y', function(d) { if(d.ranking != undefined) return yScale(d.ranking); })
+	//	  .attr('x', function(d) { if(d.ranking != undefined ) return xScale(d.date); })
+	 
+		  
+	  emo_img = emo_cells
+			  .append("image")
+			  .attr('class', 'emo-img')
+			  .attr('width', function(d) { if(d.ranking != undefined ) return 20})
+			  .attr('height', function(d) { if(d.ranking != undefined ) return 20})
+			  .style('opacity',0)
+			  .attr("xlink:href",function(d){if(d.ranking != undefined) return emoji_dat["Apple_img"]})
+	 
+	  emo_img
+			  .transition()
+			  .duration(1000)
+			  .delay(function(d,i){return 100 + i*20})
+			  .style("opacity",100)
+			  .attr('y',function(d) { if(d.ranking != undefined ) return yScale(d.ranking)+2; })
+			  .attr('x',function(d) { if(d.ranking != undefined ) return xScale(d.date); })		
+	  
+	  //emo_cells.selectAll(".emo-cell 1").select("rect").exit().transition().duration(2000).delay(function(d,i){return 4000+i*20}).style("opacity",0).remove();
+	  //emo_cells.selectAll(".emo-img 1").select("image").exit().transition().duration(2000).delay(function(d,i){return 4000+i*20}).style("opacity",0).remove();
+	
+	}
+	
+	
+	  d3.select("form").on("change",function(ev){
+		var ch = document.getElementById("choice").value;
+		console.log("Hello inside, ", ch);
+		
+		for(var i = 0; i < datalist.length; i++){
+		  if (datalist[i]["bashunicode"] == ch.split(" ")[0]) {
+			break
+		  }
+		}
+		
+		
+		update(datalist[i]["dates"],datalist[i]["data"])
+		
+		d3.event.preventDefault();
+	  
+	  })
+  
+  
+  })
+
+</script>
