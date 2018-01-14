@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+  .axis path,
+  .axis line {
+    fill: none;
+    stroke: black;
+    shape-rendering: crispEdges;
+  }
+
+  .axis text {
+      font-family: sans-serif;
+      font-size: 11px;
+  }
+</style>
+
+<div class="heatmap"></div>
+<div>
+  <form>
+	<label>Percentage</label>
+	<select id="choice" name="test">
+	  <option value="all"> all </option>
+	  <option value="80"> <= .80 </option>
+	  <option value="90"> .80--1.0 </option>
+	  <option value="100"> >= 1.0 </option>
+	</select>
+  </form>
+</div>
+
+<script src="http://d3js.org/d3.v3.min.js"></script>
+
+<script>
+  var itemSize = 22,
+      cellSize = itemSize - 1,
+      margin = {top: 120, right: 20, bottom: 20, left: 110};
+      
+  var width = 750 - margin.right - margin.left,
+      height = 300 - margin.top - margin.bottom;
+
+  var formatDate = d3.time.format("%Y-%m-%d");
+
+  d3.csv('https://gist.githubusercontent.com/Bl3f/cdb5ad854b376765fa99/raw/7ec790af76b32aa4b2eb7234e1e272d3a35272e9/data.csv', function ( response ) {
+
+    //data transformations
+	var data = response.map(function( item, i ) {
+        var newItem = {};
+        newItem.country = item.x;
+        newItem.product = item.y;
+        newItem.value = item.value;
+		newItem.id = i;
+
+        return newItem;
+    })
+
+    
+	//preliminary initialization of layouts and formats
+	var x_elements = d3.set(data.map(function( item ) { return item.product; } )).values(),
+        y_elements = d3.set(data.map(function( item ) { return item.country; } )).values();
+
+    var xScale = d3.scale.ordinal()
+        .domain(x_elements)
+        .rangeBands([0, x_elements.length * itemSize]);
+
+    var xAxis = d3.svg.axis()
+        .scale(xScale)
+        .tickFormat(function (d) {
+            return d;
+        })
+        .orient("top");
+
+    var yScale = d3.scale.ordinal()
+        .domain(y_elements)
+        .rangeBands([0, y_elements.length * itemSize]);
+
+    var yAxis = d3.svg.axis()
+        .scale(yScale)
+        .tickFormat(function (d) {
+            return d;
+        })
+        .orient("left");
+
+    var colorScale = d3.scale.threshold()
+        .domain([0.80, 1])
+        .range(["#2980B9", "#E67E22", "#27AE60", "#27AE60"]);
+
+    
+	//container (svg:g)
+	var svg = d3.select('.heatmap')
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+
+    //Axes
+	svg.append("g")
+        .attr("class", "y axis")
+        .call(yAxis)
+        .selectAll('text')
+        .attr('font-weight', 'normal');
+
+    svg.append("g")
+        .attr("class", "x axis")
+        .call(xAxis)
+        .selectAll('text')
+        .attr('font-weight', 'normal')
+        .style("text-anchor", "start")
+        .attr("dx", ".8em")
+        .attr("dy", ".5em")
+        .attr("transform", function (d) {
+            return "rotate(-65)";
+
+        });
+	  
+
+	//treat data to show only what required
+	//var filtered = data.filter(function(d,i){return d.value < .80});
+	
+	//console.log(filtered.length, data.length);
+	  
+	//Cells
+    //data binding
+	var cells = svg
+		.selectAll('rect')
+        .data(data, function(d){return d.id})
+    
+	//enter    
+	cells	
+		.enter()
+		.append('g')
+		.attr('class', 'cells')
+		.append('rect')
+        .attr('class', 'cell')
+        .attr('width', cellSize)
+        .attr('height', cellSize)
+		.attr('fill', function(d) { return colorScale(d.value); })
+		.style('opacity',0) 	
+	//update and enter
+	cells
+		.select('.cell')
+		.transition()
+		.duration(1000)
+		.delay(function(d,i){return i*20})
+		.style("opacity",100)
+		.attr('y', function(d) { return yScale(d.country); })
+        .attr('x', function(d) { return xScale(d.product); })
+
+
+
+	//exit
+	
+	////tests inside
+	//d3.select("form").on("change",function(ev){
+	//  console.log("Hello inside, ", document.getElementById("choice").value);
+	//  var ch = document.getElementById("choice").value;
+	//  cells
+	//	.select('.cell')
+	//	.attr('y', function(d) { if (d.value < Number(ch)/100) return yScale(d.country);})
+	//	.attr('x', function(d) { if (d.value <.80) return xScale(d.product); })
+	//	.attr('fill', function(d) { if (d.value <.80) return colorScale(d.value); });		
+	//  d3.event.preventDefault();
+	//  
+	//  })
+
+	//d3.select("form").on("change",function(ev){
+	//  var ch = document.getElementById("choice").value;
+	//  console.log("Hello inside, ", ch);
+	//  cells
+	//	.select('.cell')
+	//	.attr('fill', 'none')
+	//	.attr('fill', function(d) {
+	//	  if (ch == "80" & d.value < .8) {
+	//		return colorScale(d.value);
+	//	  }
+	//	  if (ch == "90" & (d.value <= 1 & d.value >= .8) ) {
+	//		return colorScale(d.value);		  
+	//	  }
+	//	  if (ch == "100" & d.value > 1.) {
+	//		return colorScale(d.value);					
+	//	  }  
+	//	
+	//	});		
+	//  d3.event.preventDefault();
+	//  
+	//  })
+
+	var update = function(dat){
+		
+		//console.log(svg.selectAll(".cell").forEach(function(d,i,a){d.forEach(function(dd){console.log(dd)})})) //here the way to get each element
+		
+		//console.log(svg.select(".cells"))
+		
+		
+		//svg.selectAll(".cells").transition().style("opacity","none").remove(); //not ok!!!
+		//svg.selectAll(".cell").remove(); //these two seems to be the best way to delete; it is an array so it doesn't have transitions and exit - I have to iterate through the array to transit through each node
+		//svg.selectAll(".cells").remove();
+		
+		//Cells
+		//data binding
+		var cells = svg
+			.selectAll('rect')
+			.data(dat, function(d){return d.id})
+		
+		//enter    
+		cells	
+			.enter()
+			.append('g')
+			.attr('class', 'cells')
+
+		cells
+			.append('rect')
+			.attr('class', 'cell')
+			.attr('width', cellSize)
+			.attr('height', cellSize)
+			.attr('fill', function(d) { return colorScale(d.value); })
+			.style('opacity',0)
+		
+		//update and enter
+
+     	cells
+			.select('.cell')
+			//.attr('fill', function(d) { return colorScale(d.value); })
+			//.delay(100)
+			.transition()
+			.duration(1000)
+			.delay(function(d,i){return i*20})
+			.style("opacity",100)
+			//.attr('fill', function(d) { return colorScale(d.value); })
+			.attr('y', function(d) { return yScale(d.country); })
+			.attr('x', function(d) { return xScale(d.product); })	
+			//.each(function(d,i){
+			//  console.log(d3.select(this))
+			//})
+			
+	//    cells
+	//		.select('.cell')
+	//		//.attr('fill', function(d) { return colorScale(d.value); })
+	//		//.delay(100)
+	//		.each(function(d,i){
+	//
+	//		  d3.select(this)
+	//			//.select('.cell')
+	//			.transition()
+	//			.duration(1000)
+	//			.delay(200)
+	//			.style("opacity",100)
+	//			//.attr('fill', function(d) { return colorScale(d.value); })
+	//			.attr('y', function(d) { return yScale(d.country); })
+	//			.attr('x', function(d) { return xScale(d.product); })				
+	//		
+	//		})
+
+
+			
+		//cells
+		//	.select('.cell')
+		//	.transition()
+		//	.duration(1000)
+		//	.delay(5000)
+		//	.style("opacity",100)	
+			
+		
+		//console.log(svg.selectAll(".cells"))
+		
+		//console.log(cells.exit()); //I found that it required id!!
+	   //cells.transition().duration(200).style("opacity",0).exit().remove();
+	   cells
+			.exit()
+			.transition()
+			.duration(500)
+			.style("opacity",0)
+			.remove();
+	  
+	}
+	
+	  
+	d3.select("form").on("change",function(ev){
+	  var ch = document.getElementById("choice").value;
+	  console.log("Hello inside, ", ch);
+	  
+	  var fil = function(ch){
+		if (ch == "80") {
+		  return data.filter(function(d){return d.value <= .8})
+		}
+		if (ch == "100") {
+		  return data.filter(function(d){return d.value >= 1.0})
+		}
+		if (ch == "90") {
+		  return data.filter(function(d){return (d.value > .8) & (d.value < 1.0) })
+		}else{
+		  return data
+		}
+	  }
+	  
+	  
+	//  var fil = function(ch){
+	//	if (ch == "80") {
+	//	  return data.forEach(function(d){
+	//		if (d.value >.8) {
+	//		  d.value = ''
+	//		}
+	//		return d})
+	//	}
+	//	if (ch == "100") {
+	//	  
+	//	  return data.forEach(function(d){
+	//		if (d.value < 1.0) {
+	//		  d.value = ''
+	//		}
+	//		return d})
+	//	
+	//	}
+	//	if (ch == "90") {
+	//	  return data.forEach(function(d){
+	//		if (d.value < .8 | d.value > 1.0) {
+	//		  d.value = ''
+	//		}
+	//		return d})
+	//	}
+	//	
+	//	else{
+	//	  return data
+	//	}
+	//  }
+	  
+	  update(fil(ch))
+	  
+	  d3.event.preventDefault();
+	  
+	  })
+	  
+});
+  
+ 
+//tests outside
+//d3.select("form")
+//  .on("change",function(err, ev){
+//	console.log("Hello outside ", ev);
+//	d3.event.preventDefault();
+//  })
+</script>

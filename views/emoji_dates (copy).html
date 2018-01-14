@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+  svg {
+	background-color: grey; 
+  }
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.axis text {
+  font: 14px sans-serif;
+  fill: white;
+}
+
+.cells path {
+  fill: none;
+  pointer-events: all;
+}
+
+.cells :hover circle {
+  fill: white;
+}
+
+</style>
+<svg width="1120" height="500"></svg>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script>
+    
+    var svg = d3.select("svg"),
+        margin = {top: 40, right: 40, bottom: 40, left: 40},
+        width = svg.attr("width") - margin.left - margin.right,
+        height = svg.attr("height") - margin.top - margin.bottom;
+
+    // parse the date / time
+    var parseTime = d3.timeParse("%d-%b-%y");
+    
+    // set the ranges
+    var xDom = d3.scaleTime().range([0, width]);
+
+
+    var g = svg.append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    
+    
+    d3.json("emojis_date_final.json", function(err, data){
+        if (err) console.log(err);
+        
+        //console.log(data);
+        
+        //for (var key in data) {
+        //    // skip loop if the property is from prototype
+        //    if (!data.hasOwnProperty(key)) continue;
+        //    console.log(key)
+        //}
+        
+        var withdate = []
+        var withoutdate = []
+        
+        Object.keys(data).forEach(key => {
+            //console.log(key);          // the name of the current key.
+            //console.log(data[key].first);
+            //console.log(new Date(data[key].first)) //this is the way
+            data[key]['unicode'] = key
+            if (data[key].first == '2018-12-31') {
+                withoutdate.push(data[key])
+            }else{
+                withdate.push(data[key])
+            }
+        });
+        
+        //console.log(d3.extent(withdate, function(d){console.log(d.first); return new Date(d.first)}))
+        
+        xDom.domain(d3.extent(withdate, function(d){return new Date(d.first)}))
+
+
+        var simulation = d3.forceSimulation(withdate)
+            .force("x", d3.forceX(function(d) { return xDom(new Date(d.first)); }).strength(1))
+            .force("y", d3.forceY(height / 2))
+            .force("collide", d3.forceCollide(10))
+            .stop();
+
+        for (var i = 0; i < 120; ++i) simulation.tick();
+        
+        g.append("g")
+            .attr("class", "axis axis--x")
+            .attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(xDom).ticks(20));
+            
+        
+        //the values of d.x and d.y are assigned to each data point at the *.forceSimulation(...) step
+            
+        var cell = g.append("g")
+            .attr("class", "cells")
+            .selectAll("g")
+            .data(d3.voronoi()
+                  .extent([[-margin.left, -margin.top], [width + margin.right, height + margin.top]])
+                  .x(function(d) { return d.x; })
+                  .y(function(d) { return d.y; })
+                  .polygons(withdate))
+            .enter()
+            .append("g");
+
+       cell
+            .append("circle")
+            .attr("r", 5)
+            .attr("cx", function(d) { if(d) return d.data.x; }) //return d.data.x
+            .attr("cy", function(d) { if(d) return d.data.y; })
+            .attr("fill", "transparent")
+            .attr("stroke", "black")
+            
+    
+        
+        //var testimg = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD0AAAA9CAYAAAAeYmHpAAADD0lEQVR42u2aq3LrMBCG+0oH9hUOPK9QWFhYemBhYWhhYWBpYGBgqGGgYduv039mq65l+SY7sjXjcS62pW/1e6Vd6eZ9heVGH46nS/FHdal/Qv+5OxZ/PO+rDTpr5bf3x/fDp9wed+f1QO8Pl686689XDAMUDw2kLU+vVfnQSNqW47kuH1rStqV46HNV/4L+9/9UNrRXcnnxWaDpUa/s9lW50HdPPnQuZzYL9O670g36e5JSLLQ3XOWsfxZoZLxBZx6rFweNZy8OmsAiVjDI1BFXNmjFzikFLz5lj2eBBqC6dE/cTTVDmxy6aUxOLVPIfTJoGhpzWF3K2HKfBJoG1vX4eeqXt2qZ0EPl3FaIw/8+npYBPaacU+T+8HyeF5oG1Hl4R5H7YGgqTi2M00xOYqElBiQgSTViH7n3hqYiL8/lgZIGssNOahIBA2DUtjG+q9x7QcfkzO/0VAiakjmJTUYIRNoMQL0pY3ov6NBhCTTV2qhkyAwMA3Ctp7QUqfeClsU59500eKXPKgeQ3CcDXF0KOEdYOSu0N6avEjrXyuVs0N74XvxaVphQwDEWu5aFhJsmNUPn1IuEpidTMihTL9BnhaaHcWBMLOhRK3E8N7BMcrju6nNkbQt5gK5qSxWSz7nJZttHNgZ0alzLdepdzlfb04Aw5LRlM7SrSI4Kp8VxtT0NcNsEQ1kTQWOERe8YRIYaVpT6sdIESDCc+a7Yl4NrPWjF0ahFz+B31eGth/Ef7QiHNt2nugdDhxvewhSPTQR4eTAPWoFHakbFC1Q0i/Pq9IzWWd40jMZbA8SgsbqGJk/eHjSzNuqQn+C70lThM/lfPkHP4jolFzwn2QmaSqiQh3NoShmDDuWXAu31rL0XWeuVsW3Q/3KoTaNJJ2glAzlbmeWGjm3b4BqbtPScZDJ0KD0bE+eC1oJ+SiSm18/bppUMbTOYknjunlYb6EmgMLpdyqVdvN8YR/cNgg7lRY/bBuWAVg9a+fJZTtJmRWPxeWfvjbVzJfBi8wXa0NQOtbFpersFHBv0Bl049JrKB2+Sq02r4bQjAAAAAElFTkSuQmCC"
+        
+        cell
+            .append("image")
+            .attr('x',function(d) { if(d) return d.data.x - 5; })
+            .attr('y',function(d) { if(d) return d.data.y - 5; })
+            .attr('width', 10)
+            .attr('height', 10)
+            //.attr("xlink:href",testimg);
+            //.attr("xlink:href",function(d,i){console.log("xlink ",d.data); return d.data.Apple_img})
+            .attr("xlink:href",function(d,i){if(d) return d.data.Apple_img})
+        
+
+      cell
+            .on("mouseover", function(d){
+              //console.log(d, this);
+               var _sel = d3
+                      .select(this)
+                _sel
+                  .select("circle")
+                  .attr("r", 15)
+                  
+                _sel
+                  .select("image")
+                  .attr('x',function(d) { if(d) return d.data.x - 10; })
+                  .attr('y',function(d) { if(d) return d.data.y - 10; })
+                  .attr('width', 20)
+                  .attr('height', 20)
+            })
+            .on("mouseout", function(d){
+               var _sel = d3
+                      .select(this)
+                _sel
+                  .select("circle")
+                  .attr("r", 5)
+                  
+                _sel
+                  .select("image")
+                  .attr('x',function(d) { if(d) return d.data.x - 5; })
+                  .attr('y',function(d) { if(d) return d.data.y - 5; })
+                  .attr('width', 10)
+                  .attr('height', 10)                   
+            })
+
+
+        cell.append("path")
+            .attr("d", function(d) { if(d) return "M" + d.join("L") + "Z"; })
+
+        
+        cell.append("title")
+            .text(function(d) {
+              //console.error(d);
+              //console.log("title ",d);
+              
+              if(d) return d.data.CLRDname + "\nin chat: " + d.data.first });
+
+        
+        cell
+            .append("rect")
+            .attr("width",1)
+            //.attr("height",function(d, i){return height - d.data.y})
+            .attr("height",function(d, i){return 20})
+            .attr("x",function(d, i){if(d) return d.data.x})
+            .attr("y",function(d, i){if(d) return d.data.y})
+            .attr("transform",function(d,i){if(d) return "translate(0," + (height - d.data.y - 20) + ")"})
+    
+    })
+</script>
